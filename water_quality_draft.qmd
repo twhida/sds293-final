@@ -627,3 +627,65 @@ ggplot() +
     color = "Parameter Type"
   )
 ```
+
+
+```{r}
+zipcode <- read_csv("zipcode.csv")
+zipcode <- zipcode |>
+  select(zipcode, n_household_2015, median_income2015, n_household_2016, median_income2016) |>
+  filter(zipcode != 78667 & zipcode != 78680 & zipcode != 78691 & zipcode != 78712 & zipcode != 78763 & zipcode != 78767)
+
+zipcode2015 <- zipcode |>
+  select(zipcode, n_household_2015, median_income2015) |>
+  rename(ZIP = zipcode)
+  
+zipcode2016 <- zipcode |>
+  select(zipcode, n_household_2016, median_income2016) |>
+  rename(ZIP = zipcode)
+
+zipcode2015$lowincome <- ifelse(zipcode2015$median_income2015 < 55653, 1, 0)
+zipcode2016$lowincome <- ifelse(zipcode2015$median_income2015 < 59039, 1, 0)
+```
+
+```{r}
+library(dplyr)
+testing$ZIP <- as.numeric(testing$ZIP)
+training$ZIP <- as.numeric(training$ZIP)
+zip_training <- left_join(training, zipcode2015, by = "ZIP")
+zip_testing <- left_join(testing, zipcode2016, by = "ZIP", )
+```
+
+```{r}
+#model
+
+library(caret)
+set.seed(1)
+# glm.fits <- glm(lowincome ~ total_frequency + median_arsenic + median_cadmium + median_chromium + median_copper + median_ecoli + median_iron + median_lead + median_lithium + median_nickel + median_coliform + median_zinc, data = zip_training, family = binomial)
+glm.fits <- glm(lowincome ~ total_frequency + median_ecoli, data = zip_training, family = binomial)
+summary(glm.fits)
+
+```
+
+
+$$p(low income) = \hat{\beta_0} + \hat{\beta_1}frequency + \hat{\beta_2}ecoli$$
+```{r}
+# Predict probabilities on the test set (zip_testing)
+predicted_probabilities <- predict(glm.fits, newdata = zip_testing, type = "response")
+
+# Convert probabilities to binary predictions: 1 if probability > 0.5, otherwise 0
+predicted_class <- ifelse(predicted_probabilities > 0.5, 1, 0)
+
+# Add predicted class as a new column to zip_testing
+zip_testing$predicted_lowincome <- predicted_class
+
+# View the predictions
+head(zip_testing[, c("lowincome", "predicted_lowincome")])  # Compare actual vs predicted
+# Create confusion matrix
+table(Actual = zip_testing$lowincome, Predicted = zip_testing$predicted_lowincome)
+accuracy <- mean(zip_testing$lowincome == zip_testing$predicted_lowincome)
+confusion_matrix <- confusionMatrix(as.factor(zip_testing$predicted_lowincome), as.factor(zip_testing$lowincome))
+print(confusion_matrix)
+
+```
+
+
